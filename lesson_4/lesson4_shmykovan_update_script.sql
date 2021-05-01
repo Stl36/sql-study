@@ -180,14 +180,14 @@ create table posts(
   from_user_id int(10) unsigned COMMENT 'Ссылка на пользователя',
   created_at datetime DEFAULT current_timestamp() COMMENT 'Время создания строки',
   updated_at datetime DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Время обновления строки',
-  deleted_at datetime DEFAULT TIMESTAMP COMMENT 'Время удаления строки'
+  deleted_at datetime TIMESTAMP COMMENT 'Время удаления строки'
 )
  
 drop table if exists likes;
 
 create table likes(
   like_from_user_id int(10) unsigned COMMENT 'Ссылка на пользователя',
-  like_to_essence_type ENUM('user','media','message','post'),
+  like_to_essence_type ENUM('users','media','messages','posts') not null,
   essence_id int(10) unsigned,
   created_at datetime DEFAULT current_timestamp() COMMENT 'Время создания строки',
   updated_at datetime DEFAULT current_timestamp() ON UPDATE current_timestamp() COMMENT 'Время обновления строки',
