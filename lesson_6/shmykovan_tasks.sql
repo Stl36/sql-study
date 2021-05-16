@@ -172,21 +172,27 @@ ALTER TABLE likes
   ADD CONSTRAINT likes_messages_id_fk 
     FOREIGN KEY (target_id) REFERENCES messages(id)
       ON DELETE CASCADE;
+ALTER TABLE likes DROP FOREIGN KEY likes_messages_id_fk ;
 
+     
 ALTER TABLE likes 
   ADD CONSTRAINT likes_users_id_fk 
     FOREIGN KEY (target_id) REFERENCES users(id)
       ON DELETE CASCADE;
+ALTER TABLE likes DROP FOREIGN KEY likes_users_id_fk ;     
      
 ALTER TABLE likes 
   ADD CONSTRAINT likes_posts_id_fk 
     FOREIGN KEY (target_id) REFERENCES posts(id)
       ON DELETE CASCADE;
+ALTER TABLE likes DROP FOREIGN KEY likes_posts_id_fk; 
+
      
 ALTER TABLE likes 
   ADD CONSTRAINT likes_media_id_fk 
     FOREIGN KEY (target_id) REFERENCES media(id)
       ON DELETE CASCADE;
+ALTER TABLE likes DROP FOREIGN KEY likes_media_id_fk; 
      
 /*
 Итоговая схема связей выгляит коряво, есть способ выровнять ее?
@@ -225,23 +231,24 @@ SELECT *
     DESC LIMIT 10 ;
 
 DESC likes;
+DESC messages ;
 -- все сообщения с лайками
-SELECT * FROM likes WHERE target_type = 'messages';
+SELECT id, target_id FROM likes WHERE target_type = 'messages';
 
+SELECT id, (
+ SELECT count(*)
+   FROM likes 
+     WHERE target_type = 'messages'
+      AND target_id = messages.id) AS likes_calc
+ FROM messages
+  ORDER BY created_at
+   DESC LIMIT 10 
+ ;
 
-
-
-
-
-
-
-
-
-
-
-
-
-
+-- проверяем выборку
+SELECT count(*) FROM likes 
+  WHERE target_type = 'messages'
+      AND target_id = 54;
 
 
 
