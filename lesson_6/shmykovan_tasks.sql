@@ -73,7 +73,17 @@ UPDATE posts SET media_id = (FLOOR(1 + (RAND() * 100)))
  
 
  
--- 2    Создать все необходимые внешние ключи и диаграмму отношений.
+-- 2    Создать все необходимые внешние ключи и диаграмму отношений.\
+ 
+ 
+ALTER TABLE media 
+  ADD CONSTRAINT media_user_id_fk 
+    FOREIGN KEY (user_id) REFERENCES users(id);
+     
+ALTER TABLE messages 
+  ADD CONSTRAINT messages_media_id_fk 
+    FOREIGN KEY (media_id) REFERENCES media(id)
+      ON DELETE SET NULL;
 
 ALTER TABLE profiles 
   ADD CONSTRAINT profiles_user_id_fk 
@@ -121,10 +131,7 @@ ALTER TABLE likes
     FOREIGN KEY (user_id) REFERENCES users(id)
       ON DELETE CASCADE;     
 
-ALTER TABLE media 
-  ADD CONSTRAINT media_user_id_fk 
-    FOREIGN KEY (user_id) REFERENCES users(id)
-      ON DELETE CASCADE; 
+
 
 ALTER TABLE media 
   ADD CONSTRAINT media_media_type_id_fk 
@@ -250,9 +257,19 @@ SELECT count(*) FROM likes
   WHERE target_type = 'messages'
       AND target_id = 54;
 
-
-
-
+-- сумма всех лайков
+SELECT sum(likes_calc)
+FROM 
+(
+SELECT (
+ SELECT count(*)
+   FROM likes 
+     WHERE target_type = 'messages'
+      AND target_id = messages.id) AS likes_calc
+ FROM messages
+  ORDER BY created_at
+   DESC LIMIT 10 
+) AS likes_sum;
 
 
 
