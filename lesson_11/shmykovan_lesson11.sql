@@ -10,4 +10,18 @@ CREATE TABLE logs (
   row_id int UNSIGNED NOT NULL,\
   row_name varchar(255)
    )  ENGINE - Archive;
-  
+CREATE TRIGGER products_insert AFTER INSERT ON products
+FOR EACH ROW
+BEGIN
+    INSERT INTO Logs VALUES (NULL, DEFAULT, "products", NEW.id, NEW.name);
+END;
+CREATE TRIGGER users_insert AFTER INSERT ON users
+FOR EACH ROW
+BEGIN
+    INSERT INTO Logs VALUES (NULL, DEFAULT, "users", NEW.id, NEW.name);
+END;
+CREATE TRIGGER catalogs_insert AFTER INSERT ON catalogs
+FOR EACH ROW
+BEGIN
+    INSERT INTO Logs VALUES (NULL, DEFAULT, "catalogs", NEW.id, NEW.name);
+END;
