@@ -65,21 +65,9 @@ SELECT id,
  
  -- ответ
   
-SELECT count(likes_id) AS sum_of_last_10_messages
-FROM 
-(
-SELECT messages.*, likes_messages.likes_id 
-  FROM messages 
-    LEFT JOIN (
-      SELECT 
-        id AS likes_id, 
-        target_id AS likes_target_id
-      FROM likes 
-      WHERE target_type = 'messages') AS likes_messages
-    ON messages.id = likes_messages.likes_target_id
-  ORDER BY messages.created_at DESC 
-  LIMIT 10
-) AS likes_sum;
+SELECT COUNT(*) AS total FROM likes
+JOIN (SELECT id FROM messages ORDER BY created_at DESC LIMIT 10) AS ms
+ON likes.target_type = 'messages' AND ms.id = likes.target_id;
   
 -- проверка
 SELECT sum(likes_calc)
