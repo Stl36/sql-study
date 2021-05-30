@@ -44,7 +44,6 @@ CREATE TABLE countries (
 CREATE TABLE shops (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT "Идентификатор сроки",
   name VARCHAR(150) NOT NULL UNIQUE COMMENT "Название магазина",
-  table_type_id INT UNSIGNED NOT NULL,
   created_at DATETIME DEFAULT CURRENT_TIMESTAMP COMMENT "Время создания строки",  
   updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP COMMENT "Время обновления строки"  
 ) COMMENT "Магазины";
@@ -59,8 +58,6 @@ CREATE TABLE shops_users (
 
 CREATE TABLE media (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT "Идентификатор строки",
-  table_type_id INT UNSIGNED NOT NULL,
-  -- table_type VARCHAR(150) NOT NULL,
   user_id INT UNSIGNED NOT NULL COMMENT "Ссылка на пользователя, который загрузил файл",
   filename VARCHAR(255) NOT NULL COMMENT "Путь к файлу",
   size INT NOT NULL COMMENT "Размер файла",
@@ -107,13 +104,10 @@ CREATE TABLE subcategory (
 -- Таблица сообщений
 CREATE TABLE messages (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY COMMENT "Идентификатор строки", 
-  table_type_id INT UNSIGNED NOT NULL,
-  -- table_type VARCHAR(150) NOT NULL,
   from_target_id INT UNSIGNED NOT NULL COMMENT "Ссылка на отправителя сообщения",
   to_target_id INT UNSIGNED NOT NULL COMMENT "Ссылка на получателя сообщения",
   from_target_type_id INT UNSIGNED NOT NULL,
   to_target_type_id INT UNSIGNED NOT NULL,
-  -- target_type ENUM('users', 'shops') NOT NULL,
   body TEXT NOT NULL COMMENT "Текст сообщения",
   is_important BOOLEAN COMMENT "Признак важности",
   is_delivered BOOLEAN COMMENT "Признак доставки",
@@ -122,8 +116,6 @@ CREATE TABLE messages (
 
 CREATE TABLE items (
   id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY,
-  table_type_id INT UNSIGNED NOT NULL,
-  -- table_type VARCHAR(150) NOT NULL,
   shop_id INT UNSIGNED NOT NULL,
   price INT UNSIGNED NOT NULL,
   description VARCHAR(100),
@@ -155,9 +147,25 @@ CREATE TABLE table_types(
   
 -- заполняем таблицу с помощью генератора данных (в данном случае fulldb)
 
-SELECT * FROM items;
+SELECT * FROM table_types ;
+DESC items;
 
 -- немного доработаем данные
+ALTER TABLE profiles ADD COLUMN sex enum(
+  'M', 'F'
+);
+UPDATE profiles SET sex = gender 
+  WHERE user_id = user_id ;
+ 
+SELECT * FROM profiles LIMIT 10;
+
+ALTER TABLE profiles DROP COLUMN gender;
+
+ALTER TABLE subcategory 
+  RENAME TO subcategories;
+
+ALTER TABLE shops_users 
+RENAME COLUMN shops_id TO shop_id; 
 
 DROP TABLE IF EXISTS extensions;
 CREATE TEMPORARY TABLE extensions (name VARCHAR(10));
@@ -203,6 +211,29 @@ UPDATE messages SET from_target_id = (SELECT FLOOR(1 + RAND() * 30))
 UPDATE messages SET to_target_id = (SELECT FLOOR(1 + RAND() * 30))
   WHERE (to_target_type_id = 4 AND to_target_id > 30);
 
+-- првоерим, есть ли в таблице сообщений записи где один магаин пишет дугому и исправим это
+DESC messages ;
+
+-- вначале перегенерируем значения, чтобы в них содержались только индексы магазинов и пользователй
+UPDATE messages SET from_target_type_id = (SELECT ELT(FLOOR(RAND() * 2) + 1,2,4) AS random_value_from_listOfValues);
+
+SELECT * FROM messages 
+  WHERE (from_target_type_id = (SELECT id FROM table_types WHERE name = 'shops')) 
+    AND (to_target_type_id = (SELECT id FROM table_types WHERE name = 'shops'));
+
+UPDATE messages SET from_target_type_id = (SELECT id FROM table_types WHERE name = 'users') 
+  WHERE messages.id <= 50 
+    AND (from_target_type_id = (SELECT id FROM table_types WHERE name = 'shops')) 
+      AND (to_target_type_id = (SELECT id FROM table_types WHERE name = 'shops'));  
+UPDATE messages SET to_target_type_id = (SELECT id FROM table_types WHERE name = 'users') 
+  WHERE messages.id > 50 
+    AND (from_target_type_id = (SELECT id FROM table_types WHERE name = 'shops')) 
+      AND (to_target_type_id = (SELECT id FROM table_types WHERE name = 'shops'));  
+ 
+-- убедимся, что нет сообщений самому себе
+
+SELECT * FROM messages 
+  WHERE from_target_type_id = to_target_type_id AND from_target_id = to_target_id ;
  
 -- построим связи между таблицами
 
@@ -241,30 +272,10 @@ ALTER TABLE items
   ADD CONSTRAINT items_shop_id_fk 
     FOREIGN KEY (shop_id) REFERENCES shops(id)
       ON DELETE CASCADE;
-     
-ALTER TABLE items
-  ADD CONSTRAINT items_table_type_id_fk 
-    FOREIGN KEY (table_type_id) REFERENCES table_types(id)
-      ON DELETE CASCADE;
-
-ALTER TABLE media
-  ADD CONSTRAINT media_type_id_fk 
-    FOREIGN KEY (media_type_id) REFERENCES media_types(id)
-      ON DELETE CASCADE;
 
 ALTER TABLE media
   ADD CONSTRAINT media_user_id_fk 
     FOREIGN KEY (user_id) REFERENCES users(id)
-      ON DELETE CASCADE;
-     
-ALTER TABLE media
-  ADD CONSTRAINT media_table_type_id_fk 
-    FOREIGN KEY (table_type_id) REFERENCES table_types(id)
-      ON DELETE CASCADE;
-
-ALTER TABLE users
-  ADD CONSTRAINT users_table_type_id_fk 
-    FOREIGN KEY (table_type_id) REFERENCES table_types(id)
       ON DELETE CASCADE;
 
 ALTER TABLE shops_users
@@ -275,11 +286,6 @@ ALTER TABLE shops_users
 ALTER TABLE shops_users
   ADD CONSTRAINT shops_users_shop_id_fk 
     FOREIGN KEY (shops_id) REFERENCES shops(id)
-      ON DELETE CASCADE;
-
-ALTER TABLE shops
-  ADD CONSTRAINT shops_table_type_id_fk 
-    FOREIGN KEY (table_type_id) REFERENCES table_types(id)
       ON DELETE CASCADE;
      
  ALTER TABLE orders
@@ -298,29 +304,33 @@ ALTER TABLE likes DROP FOREIGN KEY likes_user_id_fk;
     FOREIGN KEY (user_id) REFERENCES users(id)
       ON DELETE CASCADE;  
 
-/*
-ALTER TABLE likes
-    FOREIGN KEY (target_table_type_id, target_id) REFERENCES users(table_type_id, id)
+ALTER TABLE likes DROP FOREIGN KEY likes_user_id_fk;
+ ALTER TABLE likes
+  ADD CONSTRAINT likes_user_id_fk 
+    FOREIGN KEY (user_id) REFERENCES users(id)
       ON DELETE CASCADE;  
 
-SELECT * FROM users;
+ ALTER TABLE likes
+  ADD CONSTRAINT likes_target_table_type_id_fk 
+    FOREIGN KEY (target_table_type_id) REFERENCES table_types(id)
+      ON DELETE CASCADE;  
 
--- ADD CONSTRAINT likes_to_user_id_fk 
-*/
-DESC likes;
-ALTER TABLE likes DROP FOREIGN KEY likes_user_id_fk;
  ALTER TABLE likes
   ADD CONSTRAINT likes_user_id_fk 
     FOREIGN KEY (user_id) REFERENCES users(id)
       ON DELETE CASCADE; 
 
--- если нужно удалить ALTER TABLE profiles DROP FOREIGN KEY shops_users_user_id_fk; 
+ ALTER TABLE messages
+  ADD CONSTRAINT messages_from_target_type_id_fk 
+    FOREIGN KEY (from_target_type_id) REFERENCES table_types(id)
+      ON DELETE CASCADE; 
+     
+ ALTER TABLE messages
+  ADD CONSTRAINT messages_to_target_type_id_fk 
+    FOREIGN KEY (to_target_type_id) REFERENCES table_types(id)
+      ON DELETE CASCADE;      
 
-ALTER TABLE likes DROP FOREIGN KEY likes_user_id_fk;
- ALTER TABLE messages 
-  ADD CONSTRAINT messages_table_type_id_fk 
-    FOREIGN KEY (table_type_id) REFERENCES table_types(id)
-      ON DELETE CASCADE;  
+-- если нужно удалить ALTER TABLE profiles DROP FOREIGN KEY shops_users_user_id_fk; 
      
 -- для связи таблицы Лайков используем триггер, для этого потребуется функция
 
@@ -373,15 +383,95 @@ DELIMITER ;
 DESC likes;
 INSERT INTO likes (user_id, target_id, target_table_type_id) VALUES (34, 156, 4);
 
--- повторяем 
+-- также поступим с таблицей messages. 
 
+DROP TRIGGER IF EXISTS messages_validation;
+DELIMITER //
 
+CREATE TRIGGER messages_validation BEFORE INSERT ON messages
 
+FOR EACH ROW BEGIN
+  IF NOT is_row_exists(NEW.from_target_id, NEW.from_target_type_id) THEN
+    SIGNAL SQLSTATE "45001"
+    SET MESSAGE_TEXT = "Error adding message! Target table doesn't contain row id provided!";
+  END IF;
+  IF NOT is_row_exists(NEW.to_target_id, NEW.to_target_type_id) THEN
+    SIGNAL SQLSTATE "45001"
+    SET MESSAGE_TEXT = "Error adding message! Target table doesn't contain row id provided!";
+  END IF;
+END//
+
+DELIMITER ;
+
+-- проверяем 
+DESC messages ;
+INSERT INTO messages (
+  from_target_id, 
+  to_target_id, 
+  from_target_type_id, 
+  to_target_type_id,
+  body,
+  is_important,
+  is_delivered
+  ) 
+    VALUES (46, 41, 4, 2, 'test', 0, 0);
+   
+DESC messages ;
+INSERT INTO messages (
+  from_target_id, 
+  to_target_id, 
+  from_target_type_id, 
+  to_target_type_id,
+  body,
+  is_important,
+  is_delivered
+  ) 
+    VALUES (26, 41, 4, 2, 'test', 0, 0);
+   
+   
+-- сделаем некоторые выборки
+   
+-- 10 самых потративщихся пользователей совершивших более 1 заказа и их суммарный чек
+DESC orders ;
+DESC items;
+SELECT * FROM orders LIMIT 10;
+
+SELECT 
+  users.id, 
+  concat_ws(' ', users.first_name, users.last_name) AS user_name, 
+  (SELECT count(orders.id) 
+    FROM orders 
+      WHERE orders.user_id = users.id) AS number_of_orders, 
+  (SELECT SUM(items.price) FROM items WHERE items.id IN (orders.id)) AS total_spent
+    FROM users
+      JOIN orders 
+        ON users.id = orders.user_id 
+      JOIN items 
+        ON orders.item_id = items.id
+    WHERE (SELECT count(orders.id) 
+             FROM orders 
+           WHERE orders.user_id = users.id) > 1 
+    ORDER BY total_spent desc;
+
+SELECT sum(items.price) FROM items 
+  WHERE items.id IN (10,57);
+SELECT id FROM items 
+  WHERE id IN (SELECT id FROM orders WHERE orders.user_id = 18);
      
-     
-     
-     
-     
+ 
+-- Пример создания представления . Описание продукта, его категория и каталог
+ CREATE VIEW cat AS
+ SELECT items.description AS product , categories.name AS category , catalogs.name AS catalog
+   FROM items 
+   LEFT JOIN subcategories 
+     ON items.subcategory_id = subcategories.id 
+   LEFT JOIN categories 
+     ON subcategories.category_id = categories.id 
+   LEFT JOIN catalogs 
+     ON categories.catalog_id = catalogs.id;
+ 
+SELECT * FROM cat;
+
      
      
      
