@@ -154,6 +154,29 @@ DESC items;
 ALTER TABLE profiles ADD COLUMN sex enum(
   'M', 'F'
 );
+
+DESC items;
+ALTER TABLE items DROP COLUMN name;
+ALTER TABLE items ADD COLUMN name varchar(100
+) AFTER id;
+
+-- добавим имя для товара, сгенериров его случано из описания
+
+DROP TABLE IF EXISTS items_names;
+CREATE TEMPORARY TABLE items_names 
+  (SELECT substring(description, (SELECT FLOOR(RAND()*(10-5)+5)), (SELECT FLOOR(RAND()*(15-5)+5))) AS name FROM items);
+DESC items_names;
+SELECT * FROM items_names ;
+ALTER TABLE items_names ADD COLUMN id INT UNSIGNED NOT NULL AUTO_INCREMENT PRIMARY KEY;
+
+UPDATE items AS t1
+  INNER JOIN items_names AS t2 ON t1.id = t2.id
+SET t1.name = t2.name;
+
+SELECT * FROM items;
+
+-- изменим тип пола на ENUM
+   
 UPDATE profiles SET sex = gender 
   WHERE user_id = user_id ;
  
@@ -161,6 +184,7 @@ SELECT * FROM profiles LIMIT 10;
 
 ALTER TABLE profiles DROP COLUMN gender;
 
+-- исправим назавания
 ALTER TABLE subcategory 
   RENAME TO subcategories;
 
@@ -437,31 +461,64 @@ DESC items;
 SELECT * FROM orders LIMIT 10;
 
 SELECT 
-  users.id, 
+  DISTINCT(users.id), 
   concat_ws(' ', users.first_name, users.last_name) AS user_name, 
   (SELECT count(orders.id) 
     FROM orders 
       WHERE orders.user_id = users.id) AS number_of_orders, 
-  (SELECT SUM(items.price) FROM items WHERE items.id IN (orders.id)) AS total_spent
+  (SELECT SUM(items.price) 
+  FROM orders
+    LEFT JOIN items 
+      ON items.id = orders.item_id 
+  WHERE items.id = orders.item_id AND orders.user_id = users.id) AS total_spent
     FROM users
-      JOIN orders 
+      RIGHT JOIN orders 
         ON users.id = orders.user_id 
       JOIN items 
         ON orders.item_id = items.id
     WHERE (SELECT count(orders.id) 
              FROM orders 
            WHERE orders.user_id = users.id) > 1 
-    ORDER BY total_spent desc;
+    ORDER BY total_spent desc;  
 
+-- првоерка
+SELECT orders.item_id 
+  FROM orders
+  WHERE orders.user_id = 20;
 SELECT sum(items.price) FROM items 
-  WHERE items.id IN (10,57);
-SELECT id FROM items 
-  WHERE id IN (SELECT id FROM orders WHERE orders.user_id = 18);
-     
+  WHERE items.id IN (79,16,12,87);  
+
+-- Пример создания представления . 
+CREATE VIEW major_users AS 
+(
+SELECT 
+  DISTINCT(users.id), 
+  concat_ws(' ', users.first_name, users.last_name) AS user_name, 
+  (SELECT count(orders.id) 
+    FROM orders 
+      WHERE orders.user_id = users.id) AS number_of_orders, 
+  (SELECT SUM(items.price) 
+  FROM orders
+    LEFT JOIN items 
+      ON items.id = orders.item_id 
+  WHERE items.id = orders.item_id AND orders.user_id = users.id) AS total_spent
+    FROM users
+      RIGHT JOIN orders 
+        ON users.id = orders.user_id 
+      JOIN items 
+        ON orders.item_id = items.id
+    WHERE (SELECT count(orders.id) 
+             FROM orders 
+           WHERE orders.user_id = users.id) > 1 
+    ORDER BY total_spent desc
+);
+
+SELECT * FROM major_users;
  
--- Пример создания представления . Описание продукта, его категория и каталог
+-- Описание продукта, его категория и каталог
+ DROP VIEW IF EXISTS cat;
  CREATE VIEW cat AS
- SELECT items.description AS product , categories.name AS category , catalogs.name AS catalog
+ SELECT items.name AS product_name , categories.name AS category , catalogs.name AS catalog
    FROM items 
    LEFT JOIN subcategories 
      ON items.subcategory_id = subcategories.id 
@@ -472,8 +529,15 @@ SELECT id FROM items
  
 SELECT * FROM cat;
 
-     
-     
+-- определяем пользоватлей, потративших больше 10000
+SELECT 
+  orders.user_id AS id, 
+  (SELECT CONCAT_WS(' ', first_name, last_name) FROM users WHERE users.id = orders.user_id) AS user,
+  SUM(items.price) AS total
+  FROM items
+   RIGHT JOIN orders ON items.id = orders.item_id 
+    GROUP BY user_id
+      HAVING total > 10000;
      
      
      
